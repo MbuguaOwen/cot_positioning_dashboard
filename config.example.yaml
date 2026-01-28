@@ -1,0 +1,39 @@
+# Optional configuration file.
+# Copy this to `config.yaml` and edit.
+
+storage:
+  data_dir: data
+  # Cache for historical-compressed zip downloads.
+  hist_dir: data/historical
+  sqlite_path: data/cot.sqlite
+  parquet_dir: data/parquet
+
+sources:
+  # Official CFTC "newcot" comma-delimited files (weekly).
+  financial_futures_only_url: "https://www.cftc.gov/dea/newcot/FinFutWk.txt"
+  financial_combined_url:      "https://www.cftc.gov/dea/newcot/FinComWk.txt"
+  disagg_futures_only_url:     "https://www.cftc.gov/dea/newcot/f_disagg.txt"
+  disagg_combined_url:         "https://www.cftc.gov/dea/newcot/c_disagg.txt"
+
+contracts:
+  # Regex patterns are applied to Market_and_Exchange_Names.
+  # Tip: anchor at start to avoid cross-rate contracts (e.g. "EURO FX/JAPANESE YEN XRATE")
+  USD: "(?i)^(?:U\\.S\\.\\s*)?DOLLAR\\s+INDEX\\b"
+  EUR: "(?i)^EURO\\s+FX\\b(?!/)"
+  JPY: "(?i)^JAPANESE\\s+YEN\\b(?!/)"
+  GBP: "(?i)^BRITISH\\s+POUND\\b"
+  AUD: "(?i)^AUSTRALIAN\\s+DOLLAR\\b"
+  CHF: "(?i)^SWISS\\s+FRANC\\b"
+  # Prefer COMEX venues (avoid smaller alt listings like Coinbase micro contracts)
+  GOLD: "(?i)^GOLD\\b.*COMMODITY\\s+EXCHANGE"
+  SILVER: "(?i)^SILVER\\b.*COMMODITY\\s+EXCHANGE"
+
+bias_driver:
+  # Which participant group drives bias scoring.
+  # Options depend on dataset type; see `cot_bias/compute.py`.
+  fx_group: "lev_money"          # TFF: dealer, asset_mgr, lev_money, other_rept, nonrept
+  metals_group: "m_money"        # Disagg: prod_merc, swap, m_money, other_rept, nonrept
+
+metrics:
+  rolling_weeks: 156   # ~3 years
+  delta_weeks: 4

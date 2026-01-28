@@ -1,0 +1,8 @@
+data/
+outputs/
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+cot_bias.egg-info/
