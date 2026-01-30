@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import re
 import json
+import datetime as dt
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
@@ -23,6 +24,8 @@ DEFAULT_CONTRACT_PATTERNS = {
     "GBP": r"(?i)^BRITISH\s+POUND\b" ,
     "AUD": r"(?i)^AUSTRALIAN\s+DOLLAR\b" ,
     "CHF": r"(?i)^SWISS\s+FRANC\b" ,
+    "CAD": r"(?i)^CANADIAN\s+DOLLAR\b" ,
+    "NZD": r"(?i)^NEW\s+ZEALAND\s+DOLLAR\b" ,
 
     # Metals (Disaggregated)
     # Prefer COMEX venues (avoids smaller alternative listings like Coinbase micro contracts).
@@ -148,3 +151,16 @@ def slugify(s: str) -> str:
 
 def clamp(x: float, lo: float, hi: float) -> float:
     return lo if x < lo else hi if x > hi else x
+
+def parse_iso_date(value: Optional[str]) -> Optional[dt.date]:
+    if value is None:
+        return None
+    try:
+        return dt.date.fromisoformat(value)
+    except ValueError as exc:
+        raise ValueError(f"Invalid date '{value}'. Use YYYY-MM-DD.") from exc
+
+def most_recent_tuesday(d: dt.date) -> dt.date:
+    # Tuesday is 1 (Mon=0)
+    delta = (d.weekday() - 1) % 7
+    return d - dt.timedelta(days=delta)

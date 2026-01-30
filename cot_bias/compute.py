@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 
 from .utils import Config, clamp, slugify
+from .fx import usd_proxy_from_z, DXY_WEIGHTS, pair_regime, pair_reversal_risk_from_abs_z
 
 # ---------------------------
 # Column normalization
@@ -78,6 +79,14 @@ DISAGG_GROUPS = {
     "nonrept": ("nonrept_positions_long_all", "nonrept_positions_short_all"),
 }
 
+LEGACY_GROUPS = {
+    # Legacy report official variable names:
+    # Noncommercial / Commercial / Nonreportable
+    "noncommercial": ("noncommercial_positions_long_all", "noncommercial_positions_short_all"),
+    "commercial": ("commercial_positions_long_all", "commercial_positions_short_all"),
+    "nonreportable": ("nonreportable_positions_long_all", "nonreportable_positions_short_all"),
+}
+
 def detect_dataset_type(df: pd.DataFrame) -> str:
     cols = set(df.columns)
     # TFF (financial) has Lev_Money / Asset_Mgr columns
@@ -86,7 +95,10 @@ def detect_dataset_type(df: pd.DataFrame) -> str:
     # Disaggregated has Prod_Merc / M_Money columns
     if "prod_merc_positions_long_all" in cols or "m_money_positions_long_all" in cols:
         return "disagg"
-    raise ValueError("Could not detect dataset type from columns; expected TFF or Disaggregated fields.")
+    # Legacy has Noncommercial / Commercial columns
+    if "noncommercial_positions_long_all" in cols or "commercial_positions_long_all" in cols:
+        return "legacy"
+    raise ValueError("Could not detect dataset type from columns; expected TFF, Disaggregated, or Legacy fields.")
 
 def _open_interest_col(df: pd.DataFrame) -> str:
     for c in ["open_interest_all", "open_interest"]:
@@ -226,6 +238,8 @@ def compute_instrument_metrics(df_raw: pd.DataFrame, dataset_type: str, pattern:
         groups = TFF_GROUPS
     elif dataset_type == "disagg":
         groups = DISAGG_GROUPS
+    elif dataset_type == "legacy":
+        groups = LEGACY_GROUPS
     else:
         return pd.DataFrame()
 
@@ -276,14 +290,22 @@ def compute_instrument_metrics(df_raw: pd.DataFrame, dataset_type: str, pattern:
 
     return ts[keep].copy()
 
-def latest_rows(df: pd.DataFrame) -> pd.DataFrame:
+def latest_rows(df: pd.DataFrame, as_of: Optional[dt.date] = None) -> pd.DataFrame:
     if df.empty:
         return df
-    # latest per symbol
-    df2 = df.sort_values(["symbol", "report_date"]).groupby("symbol", as_index=False).tail(1)
+    if "report_date" not in df.columns:
+        return df
+    df2 = df.copy()
+    df2["report_date"] = pd.to_datetime(df2["report_date"], errors="coerce").dt.date
+    if as_of is not None:
+        df2 = df2[df2["report_date"] <= as_of]
+    if df2.empty:
+        return df2
+    # latest per symbol (as-of date, if provided)
+    df2 = df2.sort_values(["symbol", "report_date"]).groupby("symbol", as_index=False).tail(1)
     return df2.sort_values("symbol").reset_index(drop=True)
 
-def compute_all(cfg: Config, fin_raw: pd.DataFrame, dis_raw: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def compute_all(cfg: Config, fin_raw: pd.DataFrame, dis_raw: pd.DataFrame, as_of: Optional[dt.date] = None) -> Tuple[pd.DataFrame, pd.DataFrame]:
     fin_norm = normalize_columns(fin_raw)
     dis_norm = normalize_columns(dis_raw)
     fin_type = detect_dataset_type(fin_norm)
@@ -301,67 +323,62 @@ def compute_all(cfg: Config, fin_raw: pd.DataFrame, dis_raw: pd.DataFrame) -> Tu
     inst_df = pd.concat(instruments, ignore_index=True) if instruments else pd.DataFrame()
 
     # FX pairs dashboard (derived)
-    pairs_df = compute_pairs(latest_rows(inst_df))
+    pairs_df = compute_pairs(latest_rows(inst_df, as_of=as_of))
     return inst_df, pairs_df
 
-def compute_pairs(inst_latest: pd.DataFrame) -> pd.DataFrame:
+def compute_pairs(
+    inst_latest: pd.DataFrame,
+    usd_mode: str = "basket",
+    usd_weights: str = "equal",
+) -> pd.DataFrame:
     """Derive bias for common FX pairs using currency positioning scores.
-    For USD-base pairs (USDJPY, USDCHF), we use quote currency positioning as proxy.
+
+    USD handling:
+    - basket (default): compute USD proxy from tracked currencies
+    - direct: use USD contract if available, otherwise fallback to basket
     """
     if inst_latest.empty:
         return pd.DataFrame()
 
     # Use z-score as the strength score
-    score = {row["symbol"]: float(row["net_pct_oi_3y_z"]) if pd.notna(row["net_pct_oi_3y_z"]) else np.nan
-             for _, row in inst_latest.iterrows()}
-    pct = {row["symbol"]: float(row["net_pct_oi_3y_pctile"]) if pd.notna(row["net_pct_oi_3y_pctile"]) else np.nan
-           for _, row in inst_latest.iterrows()}
+    score = {
+        row["symbol"]: float(row["net_pct_oi_3y_z"]) if pd.notna(row["net_pct_oi_3y_z"]) else np.nan
+        for _, row in inst_latest.iterrows()
+    }
 
-    has_usd = ("USD" in score) and (not np.isnan(score.get("USD", np.nan)))
+    usd_direct = score.get("USD", np.nan)
+    if usd_mode == "direct" and not np.isnan(usd_direct):
+        usd_z = float(usd_direct)
+        usd_source = "direct"
+    else:
+        weights = None if usd_weights == "equal" else DXY_WEIGHTS
+        usd_z = usd_proxy_from_z(score, weights=weights)
+        usd_source = "basket"
 
-    def _pair(name: str, base: str, quote: str, usd_base: bool = False) -> Dict[str, object]:
-        # If we have USD index positioning, compute a proper relative score.
-        if usd_base:
-            # USDJPY / USDCHF style.
-            if has_usd:
-                s = score.get("USD", np.nan) - score.get(quote, np.nan)
-                pb = pct.get("USD", np.nan)
-                pq = pct.get(quote, np.nan)
-                p = np.nanmean([pb, 100.0 - pq]) if not (np.isnan(pb) and np.isnan(pq)) else np.nan
-            else:
-                # Fallback: proxy USD strength as the inverse of quote strength.
-                s = -score.get(quote, np.nan)
-                p = 100.0 - pct.get(quote, np.nan) if not np.isnan(pct.get(quote, np.nan)) else np.nan
-        else:
-            if quote == "USD" and not has_usd:
-                # Fallback when USD index isn't tracked: use base currency only.
-                s = score.get(base, np.nan)
-                p = pct.get(base, np.nan)
-            else:
-                s = score.get(base, np.nan) - score.get(quote, np.nan)
-                # percentile isn't linear under subtraction; we use mean as heuristic
-                pb = pct.get(base, np.nan)
-                pq = pct.get(quote, np.nan)
-                p = np.nanmean([pb, 100.0 - pq]) if not (np.isnan(pb) and np.isnan(pq)) else np.nan
-
-        bias = bias_label(s, p)
-        risk = reversal_risk_label(p)
+    def _pair(name: str, base: str, quote: str) -> Dict[str, object]:
+        base_z = usd_z if base == "USD" else score.get(base, np.nan)
+        quote_z = usd_z if quote == "USD" else score.get(quote, np.nan)
+        s = base_z - quote_z if not (np.isnan(base_z) or np.isnan(quote_z)) else np.nan
+        bias = pair_regime(s)
+        risk = pair_reversal_risk_from_abs_z(abs(s)) if not np.isnan(s) else "UNKNOWN"
         return {
             "pair": name,
-            "score_z": s,
-            "pctile_proxy": p,
+            "pair_z": s,
             "bias": bias,
             "reversal_risk": risk,
             "base": base,
             "quote": quote,
+            "base_z": base_z,
+            "quote_z": quote_z,
+            "usd_mode": usd_source,
         }
 
     rows = [
-        _pair("EURUSD", "EUR", "USD", usd_base=False),
-        _pair("AUDUSD", "AUD", "USD", usd_base=False),
-        _pair("USDJPY", "USD", "JPY", usd_base=True),
-        _pair("USDCHF", "USD", "CHF", usd_base=True),
-        _pair("GBPJPY", "GBP", "JPY", usd_base=False),
+        _pair("EURUSD", "EUR", "USD"),
+        _pair("AUDUSD", "AUD", "USD"),
+        _pair("USDJPY", "USD", "JPY"),
+        _pair("USDCHF", "USD", "CHF"),
+        _pair("GBPJPY", "GBP", "JPY"),
     ]
 
     return pd.DataFrame(rows)

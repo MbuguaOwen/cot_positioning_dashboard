@@ -66,6 +66,29 @@ You will get:
 - `outputs/pairs_latest.csv`
 - `outputs/dashboard.html`
 
+### 5) Generate an as-of dashboard (backfill)
+
+```bash
+python -m cot_bias dashboard --out outputs --as-at 2026-01-16 --release-time "3:30 p.m. ET"
+```
+
+This resolves the release date to the most recent Tuesday report date.
+
+---
+
+## FX Report (any date, no lookahead)
+
+Generate a point-in-time FX report from the official CFTC yearly compressed zips:
+
+```bash
+python -m cot_system report --date 2026-01-16 --pairs EURUSD,AUDUSD,USDJPY,GBPJPY --report-type tff --usd-mode basket --out json
+```
+
+Notes:
+- The requested date is resolved to the latest available Tuesday `report_date` at or before it.
+- USD is computed as a basket proxy by default; `--usd-mode direct` uses the USD index contract when present.
+- Output includes `requested_date`, `resolved_report_date`, and the Tuesday/Friday convention note.
+
 ---
 
 ## Configuration
@@ -118,3 +141,9 @@ This project uses the official CFTC “newcot” comma-delimited datasets:
 ## License
 
 MIT (do whatever; keep the notice).
+
+
+Example //
+python -m cot_bias fetch --combined
+python -m cot_bias compute --out outputs
+python -m cot_bias dashboard --out outputs --as-at 2026-01-27 --release-time "3:30 p.m. ET"
