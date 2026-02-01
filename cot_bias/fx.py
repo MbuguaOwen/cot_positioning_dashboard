@@ -73,3 +73,58 @@ def pair_reversal_risk_from_abs_z(abs_z: float) -> str:
         return "MED"
     return "LOW"
 
+
+def build_pairs_df(
+    z_by_ccy: Dict[str, float],
+    usd_z: float,
+    usd_mode: str = "basket",
+) -> "pd.DataFrame":
+    import pandas as pd
+
+    currencies = [c for c, z in z_by_ccy.items() if not np.isnan(z)]
+    if not np.isnan(usd_z) and "USD" not in currencies:
+        currencies.append("USD")
+    currencies = sorted(set(currencies))
+
+    rows = []
+    for base in currencies:
+        for quote in currencies:
+            if base == quote:
+                continue
+            base_z = usd_z if base == "USD" else z_by_ccy.get(base, float("nan"))
+            quote_z = usd_z if quote == "USD" else z_by_ccy.get(quote, float("nan"))
+            if np.isnan(base_z) or np.isnan(quote_z):
+                continue
+            pair_z = base_z - quote_z
+            rows.append(
+                {
+                    "pair": f"{base}{quote}",
+                    "pair_z": pair_z,
+                    "bias": pair_regime(pair_z),
+                    "reversal_risk": pair_reversal_risk_from_abs_z(abs(pair_z)),
+                    "base": base,
+                    "quote": quote,
+                    "base_z": base_z,
+                    "quote_z": quote_z,
+                    "usd_mode": usd_mode,
+                }
+            )
+
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df
+
+    bias_order = {"BULLISH": 0, "NEUTRAL": 1, "BEARISH": 2, "UNKNOWN": 3}
+    risk_order = {"EXTREME": 0, "HIGH": 1, "MED": 2, "LOW": 3, "UNKNOWN": 4}
+    df["_bias_rank"] = df["bias"].map(bias_order).fillna(9)
+    df["_risk_rank"] = df["reversal_risk"].map(risk_order).fillna(9)
+
+    # For bullish pairs, higher z should appear first; for bearish, lower z first.
+    df["_pair_rank"] = df.apply(
+        lambda r: -r["pair_z"] if r["bias"] == "BULLISH" else r["pair_z"], axis=1
+    )
+
+    df = df.sort_values(["_bias_rank", "_risk_rank", "_pair_rank", "pair"]).drop(
+        columns=["_bias_rank", "_risk_rank", "_pair_rank"]
+    )
+    return df

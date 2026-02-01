@@ -24,6 +24,7 @@ For each instrument:
 For FX pairs (EURUSD, USDJPY, GBPJPY, AUDUSD, USDCHF):
 - A **pair score** built from currency positioning (base – quote where possible; USD-base pairs use the quote currency as proxy)
 - Bias + reversal risk label
+- **FX Pairs (passed COT filters)**: long-only gate where base is BULLISH with strength MED/HIGH/EXTREME, quote is BEARISH with strength MED/HIGH/EXTREME, and the pair is BULLISH with strength MED/HIGH/EXTREME. Reversal risk is displayed (not filtered) along with a 2-report consistency flag.
 
 ---
 
@@ -41,42 +42,31 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2) Fetch latest COT data
-
-Default is **combined (Futures + Options)** for maximum completeness.
+### 2) Fetch and build the local store (official CFTC files)
 
 ```bash
-python -m cot_bias fetch --combined
+python -m cot_bias fetch --update
 ```
 
-### 3) Compute dashboard outputs
+Use `--force` to refresh the current-year zip and rebuild the store.
+
+If the store is stale for a requested `--as-of`, the dashboard command will
+auto-refresh the current year; if refresh fails (offline), the dashboard still
+renders with a warning: `AUTO-REFRESH FAILED` + `DATA STALE`.
+
+### 3) Generate an as-of HTML dashboard
 
 ```bash
-python -m cot_bias compute --out outputs
-```
-
-### 4) Generate an HTML dashboard
-
-```bash
-python -m cot_bias dashboard --out outputs
+python -m cot_bias dashboard --out outputs\\2026-01-27 --as-of 2026-01-27
 ```
 
 You will get:
-- `outputs/instruments_latest.csv`
-- `outputs/pairs_latest.csv`
-- `outputs/dashboard.html`
+- `outputs\\YYYY-MM-DD\\instruments_latest.csv`
+- `outputs\\YYYY-MM-DD\\instruments_history.csv` (truncated to <= as_of)
+- `outputs\\YYYY-MM-DD\\dashboard.html`
+- `outputs\\YYYY-MM-DD\\run_manifest.json`
 
-### 5) Generate an as-of dashboard (backfill)
-
-```bash
-python -m cot_bias dashboard --out outputs --as-at 2026-01-16 --release-time "3:30 p.m. ET"
-```
-
-This resolves the release date to the most recent Tuesday report date.
-
----
-
-## FX Report (any date, no lookahead)
+### 4) FX Report (any date, no lookahead)
 
 Generate a point-in-time FX report from the official CFTC yearly compressed zips:
 
@@ -84,8 +74,10 @@ Generate a point-in-time FX report from the official CFTC yearly compressed zips
 python -m cot_system report --date 2026-01-16 --pairs EURUSD,AUDUSD,USDJPY,GBPJPY --report-type tff --usd-mode basket --out json
 ```
 
+---
+
 Notes:
-- The requested date is resolved to the latest available Tuesday `report_date` at or before it.
+- The requested date is resolved to the latest available report_date at or before it (no lookahead).
 - USD is computed as a basket proxy by default; `--usd-mode direct` uses the USD index contract when present.
 - Output includes `requested_date`, `resolved_report_date`, and the Tuesday/Friday convention note.
 
@@ -125,6 +117,11 @@ scripts\run_weekly.bat
 bash scripts/run_weekly.sh
 ```
 
+Both scripts now:
+- refresh data,
+- build the latest dashboard in `outputs/`,
+- and regenerate dated dashboard folders for the last 4 months in `outputs/YYYY-MM-DD/`.
+
 ---
 
 ## Data Sources
@@ -144,6 +141,6 @@ MIT (do whatever; keep the notice).
 
 
 Example //
-python -m cot_bias fetch --combined
+ppython -m cot_bias fetch --update
 python -m cot_bias compute --out outputs
-python -m cot_bias dashboard --out outputs --as-at 2026-01-27 --release-time "3:30 p.m. ET"
+python -m cot_bias dashboard --out outputs --as-of 2026-01-27

@@ -5,11 +5,14 @@ storage:
   data_dir: data
   # Cache for historical-compressed zip downloads.
   hist_dir: data/historical
+  # Processed store for snapshots
+  processed_dir: data/processed
   sqlite_path: data/cot.sqlite
   parquet_dir: data/parquet
 
 sources:
-  # Official CFTC "newcot" comma-delimited files (weekly).
+  # Legacy weekly URLs (kept for compatibility). The refactor uses official
+  # yearly compressed CFTC files by default.
   financial_futures_only_url: "https://www.cftc.gov/dea/newcot/FinFutWk.txt"
   financial_combined_url:      "https://www.cftc.gov/dea/newcot/FinComWk.txt"
   disagg_futures_only_url:     "https://www.cftc.gov/dea/newcot/f_disagg.txt"

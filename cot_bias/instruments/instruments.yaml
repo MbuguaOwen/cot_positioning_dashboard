@@ -1,0 +1,57 @@
+# Instrument mapping for COT dashboard
+# report_type: tff (FX futures), disagg (metals)
+# market_match: regex (case-insensitive)
+- symbol: EUR
+  human_name: Euro FX
+  report_type: tff
+  market_code: '099741'
+  market_match: '(?i)^EURO\s+FX\b(?!/)'
+  driver_group: lev_money
+- symbol: JPY
+  human_name: Japanese Yen
+  report_type: tff
+  market_code: '097741'
+  market_match: '(?i)^JAPANESE\s+YEN\b(?!/)'
+  driver_group: lev_money
+- symbol: GBP
+  human_name: British Pound
+  report_type: tff
+  market_code: '096742'
+  market_match: '(?i)^BRITISH\s+POUND\b'
+  driver_group: lev_money
+- symbol: CHF
+  human_name: Swiss Franc
+  report_type: tff
+  market_code: '092741'
+  market_match: '(?i)^SWISS\s+FRANC\b'
+  driver_group: lev_money
+- symbol: AUD
+  human_name: Australian Dollar
+  report_type: tff
+  market_code: '232741'
+  market_match: '(?i)^AUSTRALIAN\s+DOLLAR\b'
+  driver_group: lev_money
+- symbol: NZD
+  human_name: New Zealand Dollar
+  report_type: tff
+  market_code: '112741'
+  market_match: '(?i)^NEW\s+ZEALAND\s+DOLLAR\b'
+  driver_group: lev_money
+- symbol: CAD
+  human_name: Canadian Dollar
+  report_type: tff
+  market_code: '090741'
+  market_match: '(?i)^CANADIAN\s+DOLLAR\b'
+  driver_group: lev_money
+- symbol: GOLD
+  human_name: Gold (COMEX)
+  report_type: disagg
+  market_code: '088691'
+  market_match: '(?i)^GOLD\b.*COMMODITY\s+EXCHANGE'
+  driver_group: m_money
+- symbol: SILVER
+  human_name: Silver (COMEX)
+  report_type: disagg
+  market_code: '084691'
+  market_match: '(?i)^SILVER\b.*COMMODITY\s+EXCHANGE'
+  driver_group: m_money

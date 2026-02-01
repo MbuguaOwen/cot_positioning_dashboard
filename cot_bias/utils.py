@@ -37,6 +37,7 @@ DEFAULT_CONTRACT_PATTERNS = {
 class Config:
     data_dir: Path
     hist_dir: Path
+    processed_dir: Path
     sqlite_path: Path
     parquet_dir: Path
 
@@ -77,6 +78,7 @@ def load_config(config_path: Optional[str] = None) -> Config:
     # Defaults
     data_dir = Path("data")
     hist_dir = data_dir / "historical"
+    processed_dir = data_dir / "processed"
     sqlite_path = data_dir / "cot.sqlite"
     parquet_dir = data_dir / "parquet"
     urls = dict(DEFAULT_URLS)
@@ -98,6 +100,8 @@ def load_config(config_path: Optional[str] = None) -> Config:
             hist_dir = data_dir / "historical"
         if "hist_dir" in storage:
             hist_dir = Path(storage["hist_dir"])
+        if "processed_dir" in storage:
+            processed_dir = Path(storage["processed_dir"])
         if "sqlite_path" in storage:
             sqlite_path = Path(storage["sqlite_path"])
         if "parquet_dir" in storage:
@@ -128,6 +132,7 @@ def load_config(config_path: Optional[str] = None) -> Config:
     return Config(
         data_dir=data_dir,
         hist_dir=hist_dir,
+        processed_dir=processed_dir,
         sqlite_path=sqlite_path,
         parquet_dir=parquet_dir,
         urls=urls,
@@ -141,6 +146,7 @@ def load_config(config_path: Optional[str] = None) -> Config:
 def ensure_dirs(cfg: Config) -> None:
     cfg.data_dir.mkdir(parents=True, exist_ok=True)
     cfg.hist_dir.mkdir(parents=True, exist_ok=True)
+    cfg.processed_dir.mkdir(parents=True, exist_ok=True)
     cfg.parquet_dir.mkdir(parents=True, exist_ok=True)
     if cfg.sqlite_path.parent != Path("."):
         cfg.sqlite_path.parent.mkdir(parents=True, exist_ok=True)

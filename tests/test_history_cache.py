@@ -13,6 +13,7 @@ class TestHistoricalCache(unittest.TestCase):
             cfg = Config(
                 data_dir=data_dir,
                 hist_dir=data_dir / "historical",
+                processed_dir=data_dir / "processed",
                 sqlite_path=data_dir / "cot.sqlite",
                 parquet_dir=data_dir / "parquet",
                 urls=dict(DEFAULT_URLS),
