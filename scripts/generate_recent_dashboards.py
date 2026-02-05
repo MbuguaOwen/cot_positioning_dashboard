@@ -52,6 +52,12 @@ def main() -> None:
     )
     parser.add_argument("--months", type=int, default=4, help="Months of history to include.")
     parser.add_argument(
+        "--year",
+        type=int,
+        default=None,
+        help="Calendar year to include (for example: 2025). Overrides --months when provided.",
+    )
+    parser.add_argument(
         "--processed-parquet",
         default="data/processed/cot.parquet",
         help="Path to processed parquet store.",
@@ -59,16 +65,21 @@ def main() -> None:
     parser.add_argument("--out", default="outputs", help="Root output directory.")
     args = parser.parse_args()
 
-    if args.months <= 0:
-        raise ValueError("--months must be >= 1.")
-
     report_dates = load_report_dates(Path(args.processed_parquet))
     if not report_dates:
         raise ValueError("No report dates found in processed store.")
 
     latest = report_dates[-1]
-    cutoff = subtract_months(latest, args.months)
-    selected = [d for d in report_dates if d >= cutoff]
+    if args.year is not None:
+        selected = [d for d in report_dates if d.year == args.year]
+        selection_note = f"calendar year {args.year}"
+    else:
+        if args.months <= 0:
+            raise ValueError("--months must be >= 1.")
+        cutoff = subtract_months(latest, args.months)
+        selected = [d for d in report_dates if d >= cutoff]
+        selection_note = f"last {args.months} month(s)"
+
     if not selected:
         print("No report dates in selected window.")
         return
@@ -78,7 +89,7 @@ def main() -> None:
 
     print(
         f"Generating {len(selected)} dashboards from {selected[0].isoformat()} "
-        f"to {selected[-1].isoformat()} (latest={latest.isoformat()}, months={args.months}).",
+        f"to {selected[-1].isoformat()} ({selection_note}, latest={latest.isoformat()}).",
         flush=True,
     )
     for report_date in selected:

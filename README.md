@@ -122,6 +122,12 @@ Both scripts now:
 - build the latest dashboard in `outputs/`,
 - and regenerate dated dashboard folders for the last 4 months in `outputs/YYYY-MM-DD/`.
 
+To generate a full calendar year manually (example: all 2025 report dates):
+
+```bash
+python scripts/generate_recent_dashboards.py --year 2025 --out outputs
+```
+
 ---
 
 ## Data Sources
