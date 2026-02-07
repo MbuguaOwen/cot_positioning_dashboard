@@ -3,12 +3,12 @@ from __future__ import annotations
 import numpy as np
 
 
-def bias_label(score: float) -> str:
-    if np.isnan(score):
+def bias_label(z_3y: float) -> str:
+    if np.isnan(z_3y):
         return "UNKNOWN"
-    if score >= 0.75:
+    if z_3y >= 0.5:
         return "BULLISH"
-    if score <= -0.75:
+    if z_3y <= -0.5:
         return "BEARISH"
     return "NEUTRAL"
 

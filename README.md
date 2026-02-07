@@ -93,6 +93,12 @@ You can optionally create a `config.yaml` (copy from `config.example.yaml`) to:
 
 If you don’t provide a config, sane defaults are used.
 
+For a production-oriented multi-layer COT permission model (direction + spread +
+flow + crowdedness + macro + optional news blackout), see:
+- `docs/cot_filter_design.md`
+- `config.example.yaml` (`cot_filter:` block)
+- `cot_bias/filters/cot_filter.py`
+
 ---
 
 ## Notes on interpretation (practical)

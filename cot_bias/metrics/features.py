@@ -42,7 +42,7 @@ def compute_metrics(df: pd.DataFrame, window: int = 156) -> pd.DataFrame:
         g["delta_4w"] = g["net_pct_oi"] - g["net_pct_oi"].shift(4)
         g["z_delta_4w"] = rolling_zscore(g["delta_4w"], window)
         g["score"] = g["z_3y"] + 0.35 * g["z_delta_4w"]
-        g["bias"] = g["score"].apply(bias_label)
+        g["bias"] = g["z_3y"].apply(bias_label)
         g["reversal_risk"] = g.apply(lambda r: reversal_risk_label(r["pctile_3y"], r["z_3y"]), axis=1)
         return g
 

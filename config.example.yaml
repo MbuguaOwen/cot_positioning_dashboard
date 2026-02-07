@@ -40,3 +40,117 @@ bias_driver:
 metrics:
   rolling_weeks: 156   # ~3 years
   delta_weeks: 4
+
+# Strength-first shortlist based on pair_z only
+cot_strength_filter:
+  enabled: true
+  strong_threshold: 2.0
+  sniper_threshold: 2.5
+  mode: strong  # strong | sniper
+
+# Quality gates (2d table) scored on top of 3-report strong persistence
+quality_gates:
+  quality_strength_mode: B1_MIN_MAG    # B1_MIN_MAG | B2_NOT_FADING | B3_Z_GAP
+  quality_crowding_policy: SOFT_PENALTY # HARD_BLOCK | SOFT_PENALTY
+  quality_collapse_policy: SOFT_PENALTY # HARD_BLOCK | SOFT_PENALTY
+
+# -----------------------------------------------------------------------------
+# Optional multi-layer COT filter for Pine entry gating.
+# Pine remains the trigger; this filter acts as permission/regime.
+# -----------------------------------------------------------------------------
+cot_filter:
+  enabled: true
+  strictness_tier: balanced # loose | balanced | strict | sniper
+
+  release_alignment:
+    timezone: "America/New_York"
+    release_weekday: "friday"
+    release_time: "15:30"
+    freeze_midweek: true
+
+  metric:
+    kind: net_pctile # net_pctile | net_z | net_pct_oi
+    lookback_weeks: 156
+    min_history_weeks: 104
+
+  directional_bias:
+    method: spread_sign # spread_sign | net_sign | pctile_sign | z_sign
+    neutral_band:
+      net_pctile: 2.0
+      net_z: 0.05
+      net_pct_oi: 0.25
+
+  spread_gate:
+    enabled: true
+    threshold_by_metric:
+      net_pctile: { loose: 8.0, balanced: 15.0, strict: 22.0, sniper: 30.0 }
+      net_z:      { loose: 0.35, balanced: 0.60, strict: 0.90, sniper: 1.20 }
+      net_pct_oi: { loose: 2.0, balanced: 3.5, strict: 5.0, sniper: 6.5 }
+
+  flow_gate:
+    enabled_by_tier: { loose: false, balanced: true, strict: true, sniper: true }
+    lag_weeks_by_tier: { loose: 1, balanced: 2, strict: 2, sniper: 3 }
+    min_dspread_by_metric:
+      net_pctile: { loose: 0.0, balanced: 2.0, strict: 3.0, sniper: 5.0 }
+      net_z:      { loose: 0.0, balanced: 0.12, strict: 0.20, sniper: 0.30 }
+      net_pct_oi: { loose: 0.0, balanced: 0.4, strict: 0.7, sniper: 1.0 }
+    acceleration_required_by_tier: { loose: false, balanced: false, strict: true, sniper: true }
+
+  crowdedness:
+    enabled_by_tier: { loose: false, balanced: true, strict: true, sniper: true }
+    metric_kind: net_pctile
+    high_by_tier: { loose: 95.0, balanced: 92.0, strict: 90.0, sniper: 88.0 }
+    low_by_tier: { loose: 5.0, balanced: 8.0, strict: 10.0, sniper: 12.0 }
+    policy_by_tier:
+      loose: allow
+      balanced: allow_if_strong_flow
+      strict: block
+      sniper: block
+    strong_flow_override_min_by_metric:
+      net_pctile: { loose: 0.0, balanced: 4.0, strict: 6.0, sniper: 8.0 }
+      net_z:      { loose: 0.0, balanced: 0.25, strict: 0.35, sniper: 0.50 }
+      net_pct_oi: { loose: 0.0, balanced: 1.0, strict: 1.4, sniper: 2.0 }
+    risk_multiplier_if_policy_c:
+      one_side_crowded: 0.75
+      both_sides_crowded: 0.50
+
+  macro:
+    enabled: true
+    method: usd_vs_basket # usd_vs_basket | dxy_cot
+    metric_kind: net_z
+    usd_basket: [EUR, JPY, GBP, AUD, CAD, CHF, NZD]
+    align_threshold: 0.25
+    macro_gate_required: false
+    macro_gate_required_by_tier: { loose: false, balanced: false, strict: true, sniper: true }
+    reversal_mode_enabled: false
+    reversal_min_flow_multiplier: 1.5
+
+  news_blackout:
+    enabled: false
+    calendar_path: null
+    tier1_only: true
+    pre_hours: 4
+    post_hours: 2
+    required_by_tier: { loose: false, balanced: false, strict: false, sniper: true }
+
+  scoring:
+    enabled: true
+    weights:
+      spread_strength: 40.0
+      flow_alignment: 25.0
+      crowdedness_penalty: 20.0
+      macro_alignment: 15.0
+      news_penalty: 10.0
+    baseline: 50.0
+    clamp_min: 0.0
+    clamp_max: 100.0
+    min_score_to_allow_by_tier: { loose: 30.0, balanced: 40.0, strict: 50.0, sniper: 65.0 }
+    enforce_min_score_gate: false
+
+  sizing:
+    use_score_for_size: true
+    score_bands:
+      - { min: 0, max: 39, multiplier: 0.00 }
+      - { min: 40, max: 54, multiplier: 0.50 }
+      - { min: 55, max: 69, multiplier: 0.75 }
+      - { min: 70, max: 100, multiplier: 1.00 }
