@@ -21,6 +21,7 @@ from .dashboard.gate import compute_gated_fx_pairs
 from .fx import usd_proxy_from_z, build_pairs_df
 from .reporting import run_report, format_report_output, write_report_tables, resolve_report_date_by_release
 from .filters.cot_filter import COTFilter, default_cot_filter_config
+from .fx_bias_v2 import load_fx_bias_v2_config, run_fx_bias_engine_v2_from_paths
 
 
 QUALITY_STRENGTH_MODES = {"B1_MIN_MAG", "B2_NOT_FADING", "B3_Z_GAP"}
@@ -1094,6 +1095,35 @@ def cmd_report(args: argparse.Namespace) -> None:
         print(f"Wrote: {output}")
 
 
+def cmd_fx_bias_v2(args: argparse.Namespace) -> None:
+    cfg_v2 = load_fx_bias_v2_config(args.config)
+    if not cfg_v2.enabled:
+        raise ValueError("fx_bias_engine_v2.enabled is false in config.")
+
+    out = run_fx_bias_engine_v2_from_paths(
+        as_of=args.as_of,
+        cfg=cfg_v2,
+        prices_path=args.prices,
+        rates_path=args.rates,
+        risk_path=args.risk,
+        carry_path=args.carry,
+        skew_path=args.skew,
+        cot_path=args.cot,
+        out_dir=args.out,
+        pairs_csv=args.pairs,
+    )
+    run_meta = out.get("RunMeta", {}) if isinstance(out, dict) else {}
+    print(f"Wrote: {Path(args.out) / 'fx_bias_v2_run.json'}")
+    print(f"Wrote: {Path(args.out) / 'fx_bias_v2_dashboard.html'}")
+    if isinstance(run_meta, dict):
+        print(f"as_of_ts: {run_meta.get('as_of_ts')}")
+        warnings = run_meta.get("warnings", [])
+        if isinstance(warnings, list) and warnings:
+            print("warnings:")
+            for w in warnings:
+                print(f"- {w}")
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="cot_bias", description="COT Positioning Dashboard (FX + Metals)")
     p.add_argument("--config", default=None, help="Optional path to config.yaml (requires PyYAML).")
@@ -1199,6 +1229,22 @@ def build_parser() -> argparse.ArgumentParser:
     p_rep.add_argument("--refresh", action="store_true", help="Force refresh of current-year CFTC zip.")
     p_rep.add_argument("--verbose", action="store_true", help="Verbose output (prints SHA256).")
     p_rep.set_defaults(func=cmd_report)
+
+    p_v2 = sub.add_parser("fx-bias-v2", help="Run FX Bias Engine v2 (non-COT-led).")
+    p_v2.add_argument("--as-of", required=False, help="As-of timestamp/date (ISO). Defaults to now UTC.")
+    p_v2.add_argument("--out", default="outputs/fx_bias_v2", help="Output directory for JSON/CSV bundle.")
+    p_v2.add_argument(
+        "--prices",
+        default=None,
+        help="Path to price CSV directory or single CSV. Directory files can be named like EURUSD_D1.csv.",
+    )
+    p_v2.add_argument("--rates", default=None, help="Optional rates CSV path.")
+    p_v2.add_argument("--risk", default=None, help="Optional risk proxies CSV path.")
+    p_v2.add_argument("--carry", default=None, help="Optional carry/forward points CSV path.")
+    p_v2.add_argument("--skew", default=None, help="Optional RR25 skew CSV path.")
+    p_v2.add_argument("--cot", default=None, help="Optional COT overlay flags CSV path.")
+    p_v2.add_argument("--pairs", default=None, help="Optional comma-separated pair filter.")
+    p_v2.set_defaults(func=cmd_fx_bias_v2)
 
     return p
 

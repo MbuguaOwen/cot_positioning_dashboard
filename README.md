@@ -83,6 +83,73 @@ Notes:
 
 ---
 
+## FX Bias Engine v2 (Non-COT-Led)
+
+This repo now includes an optional v2 engine where directional bias is driven by:
+- price regime (primary)
+- rates momentum (secondary)
+- risk regime overlay (JPY/CHF)
+- carry (structural)
+- optional skew confirmation
+
+COT is overlay-only (`confidence/sizing`), never directional.
+
+### Run v2
+
+```bash
+python -m cot_bias --config config.yaml fx-bias-v2 \
+  --as-of 2026-03-02T21:00:00Z \
+  --prices data/fx/prices \
+  --rates data/fx/rates_2y.csv \
+  --risk data/fx/risk_proxies.csv \
+  --carry data/fx/forward_points.csv \
+  --skew data/fx/rr25.csv \
+  --cot data/fx/cot_flags.csv \
+  --out outputs/fx_bias_v2
+```
+
+Outputs:
+- `outputs/fx_bias_v2/fx_bias_v2_run.json`
+- `outputs/fx_bias_v2/fx_bias_v2_dashboard.html`
+- `outputs/fx_bias_v2/currency_strength_bias.csv`
+- `outputs/fx_bias_v2/pair_bias_trade_gate.csv`
+- `outputs/fx_bias_v2/capability_matrix.csv`
+- `outputs/fx_bias_v2/currency_polarity_pairs.csv`
+- `outputs/fx_bias_v2/diagnostics.json`
+
+Required top-level keys in JSON:
+- `RunMeta`
+- `CapabilityMatrix`
+- `A_Currency_Strength_Bias`
+- `B_Pair_Bias_Trade_Gate`
+- `C_Diagnostics`
+- `D_Currency_Polarity_Pairs`
+
+Currency polarity orientation (operator note):
+- Pair direction is **BASE minus QUOTE** (`Spread = BaseBias - QuoteBias`).
+- A bullish quote currency makes the pair bearish (negative spread).
+
+Price input convention:
+- CSV files in a directory, e.g. `EURUSD_D1.csv`, `EURUSD_H4.csv`, `USDJPY_W1.csv`
+- Columns: `ts/open/high/low/close/volume` (or equivalent aliases)
+- Loader is recursive (`--prices data\fx\prices` scans nested folders).
+- If `D1` is missing but `H1`/`H4` exists, v2 auto-builds `D1` bars (and `W1` fallback) without lookahead.
+
+Optional dataset conventions:
+- `rates`: `currency,ts,y2_value`
+- `risk`: `asset,ts,value`
+- `carry`: `pair,ts,forward_points`
+- `skew`: `symbol_or_ccy,ts,rr25[,quality_flags]`
+- `cot`: `currency,ts,extreme_flag,persistence_flag`
+
+If a component is missing/stale, v2 sets it to `null`, logs it in `CapabilityMatrix`, and reduces confidence.
+
+Design docs:
+- `docs/fx_bias_engine_v2_manual.md`
+- `docs/adr/0001-fx-bias-engine-v2-non-cot-led.md`
+
+---
+
 ## Configuration
 
 You can optionally create a `config.yaml` (copy from `config.example.yaml`) to:

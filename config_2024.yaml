@@ -38,7 +38,7 @@ bias_driver:
   metals_group: "m_money"        # Disagg: prod_merc, swap, m_money, other_rept, nonrept
 
 metrics:
-  rolling_weeks: 156   # ~3 years
+  rolling_weeks: 104   # ~3 years
   delta_weeks: 4
 
 # Strength-first shortlist based on pair_z only
@@ -70,8 +70,8 @@ cot_filter:
 
   metric:
     kind: net_pctile # net_pctile | net_z | net_pct_oi
-    lookback_weeks: 156
-    min_history_weeks: 104
+    lookback_weeks: 104
+    min_history_weeks: 78
 
   directional_bias:
     method: spread_sign # spread_sign | net_sign | pctile_sign | z_sign
@@ -154,84 +154,3 @@ cot_filter:
       - { min: 40, max: 54, multiplier: 0.50 }
       - { min: 55, max: 69, multiplier: 0.75 }
       - { min: 70, max: 100, multiplier: 1.00 }
-
-# -----------------------------------------------------------------------------
-# FX Bias Engine v2 (non-COT-led)
-# -----------------------------------------------------------------------------
-fx_bias_engine_v2:
-  enabled: true
-
-  timeframes: [W1, D1, H4, H1]
-
-  # Tradable universe used by D_Currency_Polarity_Pairs diagnostics.
-  tradable_pairs:
-    - EURUSD
-    - GBPUSD
-    - AUDUSD
-    - NZDUSD
-    - USDCAD
-    - USDCHF
-    - USDJPY
-    - EURJPY
-    - GBPJPY
-    - EURGBP
-    - AUDJPY
-    - NZDJPY
-    - CADJPY
-    - CHFJPY
-
-  freshness_minutes:
-    prices: 240
-    rates: 1440
-    risk: 240
-    carry: 2880
-    skew: 4320
-    cot: 10080
-
-  price_regime:
-    method: ema200_atr
-    ema_len: 200
-    atr_len: 14
-    slope_k:
-      W1: 20
-      D1: 20
-      H4: 12
-      H1: 12
-    thresholds:
-      range_strength_lt: 35
-      slope_abs_min: 0.05
-      pos_abs_min: 0.20
-
-  currency_strength:
-    horizons_days: [5, 20, 60]
-    zscore_lookback_days: 252
-    ridge_lambda: 1.0e-4
-    clip_z: 3.0
-    min_pair_coverage_ratio: 0.65
-
-  weights:
-    price: 0.50
-    rates: 0.30
-    risk: 0.10
-    carry: 0.10
-    skew_if_available:
-      carry: 0.05
-      skew: 0.05
-
-  risk_overlay:
-    enabled: true
-    jpy_chf_overlay_abs: 0.60
-
-  gate:
-    t_bias: 15
-    opposing_strength_block: 60
-
-  cot_overlay:
-    enabled: true
-    confidence_penalty_if_extreme_and_persistent: 10
-
-  # Currency polarity diagnostics (BASE - QUOTE orientation).
-  currency_polarity_pairs:
-    spread_threshold: 20.0
-    min_confidence: 60
-    top_n: 20
